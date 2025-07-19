@@ -85,11 +85,15 @@ def save_to_history(outfit, weather, season, mood, event, style_preference, colo
         if os.path.exists(history_file):
             with open(history_file, "r") as f:
                 history = json.load(f)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, IOError) as e:
+        st.warning(f"Error reading history file: {str(e)}. Starting with an empty history.")
         history = []
     history.append(history_entry)
-    with open(history_file, "w") as f:
-        json.dump(history, f, indent=4)
+    try:
+        with open(history_file, "w") as f:
+            json.dump(history, f, indent=4)
+    except IOError as e:
+        st.error(f"Error saving to history file: {str(e)}")
 
 # Function to save wardrobe
 def save_wardrobe(wardrobe_name, wardrobe_items):
@@ -99,11 +103,15 @@ def save_wardrobe(wardrobe_name, wardrobe_items):
         if os.path.exists(wardrobe_file):
             with open(wardrobe_file, "r") as f:
                 wardrobes = json.load(f)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, IOError) as e:
+        st.warning(f"Error reading wardrobe file: {str(e)}. Starting with an empty wardrobe.")
         wardrobes = {}
     wardrobes[wardrobe_name] = wardrobe_items
-    with open(wardrobe_file, "w") as f:
-        json.dump(wardrobes, f, indent=4)
+    try:
+        with open(wardrobe_file, "w") as f:
+            json.dump(wardrobes, f, indent=4)
+    except IOError as e:
+        st.error(f"Error saving wardrobe file: {str(e)}")
 
 # Function to load wardrobes
 def load_wardrobes():
@@ -112,7 +120,8 @@ def load_wardrobes():
         if os.path.exists(wardrobe_file):
             with open(wardrobe_file, "r") as f:
                 return json.load(f)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, IOError) as e:
+        st.warning(f"Error loading wardrobes: {str(e)}. Returning empty wardrobe.")
         return {}
     return {}
 
@@ -142,7 +151,7 @@ def generate_latex(outfit_suggestion):
     %s
     \end{verbatim}
     \end{document}
-    """ % outfit_suggestion.replace('$', r'\$').replace('&', r'\&').replace('%', r'\%').replace('#', r'\#'))
+    """ % outfit_suggestion.replace('$', r'\$').replace('&', r'\&').replace('%', r'\%').replace('#', r'\#').replace('_', r'\_').replace('{', r'\{').replace('}', r'\}'))
     return latex_content
 
 # Streamlit UI
@@ -151,7 +160,9 @@ st.set_page_config(page_title="Chikki: Fashion Stylist", page_icon="👗", layou
 # Custom CSS for vibrant, modern UI
 st.markdown("""
 <style>
-    .main { background: linear-gradient(to bottom, #f5f5f5, #e0e7ff); }
+    .main {
+        background: linear-gradient(to bottom, #f5f5f5, #e0e7ff);
+    }
     .stButton>button {
         background: linear-gradient(to right, #4CAF50, #45a049);
         color: white;
@@ -160,7 +171,9 @@ st.markdown("""
         padding: 10px 20px;
         transition: transform 0.3s ease;
     }
-    .stButton>button:hover { transform: scale(1.05); }
+    .stButton>button:hover {
+        transform: scale(1.05);
+    }
     .stTextInput>div>input, .stTextArea>div>textarea {
         border-radius: 10px;
         border: 2px solid #4CAF50;
@@ -169,13 +182,22 @@ st.markdown("""
         border-radius: 10px;
         border: 2px solid #4CAF50;
     }
-    .stMarkdown { font-family: 'Poppins', sans-serif; }
+    .stMarkdown {
+        font-family: 'Poppins', sans-serif;
+    }
     .sidebar .sidebar-content {
         background: linear-gradient(to bottom, #e0e0e0, #d1d5db);
     }
-    h1 { color: #1e3a8a; font-weight: bold; }
-    h3 { color: #3b82f6; }
-    .stProgress .st-bo { background-color: #4CAF50; }
+    h1 {
+        color: #1e3a8a;
+        font-weight: bold;
+    }
+    h3 {
+        color: #3b82f6;
+    }
+    .stProgress .st-bo {
+        background-color: #4CAF50;
+    }
     .wardrobe-item {
         background: #ffffff;
         border-radius: 8px;
@@ -186,7 +208,9 @@ st.markdown("""
         color: #1e3a8a; /* Dark navy blue for better contrast */
         font-weight: 500;
     }
-    .wardrobe-item:hover { transform: scale(1.02); }
+    .wardrobe-item:hover {
+        transform: scale(1.02);
+    }
     .footer {
         background: linear-gradient(to right, #1e3a8a, #d4af37); /* Navy to soft gold */
         color: #ffffff;
@@ -216,6 +240,9 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Add heading
+st.title("Fiza Fashion Stylist")
 
 # Initialize session state
 if 'wardrobe' not in st.session_state:
@@ -294,7 +321,7 @@ with tabs[1]:
         # Download as PDF
         latex_content = generate_latex(st.session_state.outfit_suggestion)
         b64 = base64.b64encode(latex_content.encode()).decode()
-        href = f'<a href="data:application/x-tex;base64,{b64}" download="outfit_suggestion.tex">Download Outfit as LaTeX</a>'
+        href = f'<a href="data:application/octet-stream;base64,{b64}" download="outfit_suggestion.tex"> Download Outfit as LaTeX</a>'
         st.markdown(href, unsafe_allow_html=True)
     
     # Feedback section
@@ -328,8 +355,8 @@ with tabs[2]:
                     st.markdown(f"- **Style Preference**: {entry.get('style_preference', 'Not specified')}")
                     st.markdown(f"- **Color Preference**: {entry.get('color_preference', 'Not specified')}")
                     st.markdown(f"### Outfit\n{entry.get('outfit', 'No outfit details available')}")
-        except json.JSONDecodeError:
-            st.warning("History file is corrupted. Starting with an empty history.")
+        except (json.JSONDecodeError, IOError) as e:
+            st.warning(f"History file is corrupted or inaccessible: {str(e)}. Starting with an empty history.")
 
 # Clear inputs button
 if st.button("Reset App"):
